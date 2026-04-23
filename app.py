@@ -11,27 +11,35 @@ import json
 from gtts import gTTS
 from googletrans import Translator
 
-# --- PARTE ESTÉTICA (CSS) ---
+# --- CONFIGURACIÓN VISUAL Y CSS ---
 st.set_page_config(page_title="Interfaces Multimodales", page_icon="🌸")
 
 st.markdown("""
     <style>
-    .main { background-color: #fff5f7; }
-    h1, h2, h3 { color: #d02090 !important; }
-    /* Estilo para el botón de Bokeh */
-    .bk-btn-success {
-        background-color: #ff69b4 !important;
-        border-color: #ff1493 !important;
+    /* Fondo de la página */
+    .main { background-color: #fffafa; }
+    
+    /* Títulos en fucsia */
+    h1, h2, h3, .stSubheader { color: #ff1493 !important; }
+
+    /* ESTILO PARA EL BOTÓN DE INICIO (ROSADO) */
+    .bk-btn {
+        background-color: #ff69b4 !important; /* Rosado principal */
         color: white !important;
-        border-radius: 15px !important;
+        border-radius: 10px !important;
+        border: 2px solid #db7093 !important;
+        font-weight: bold !important;
+        height: 50px !important;
     }
-    /* Estilo para los textos de Streamlit */
-    .stWrite { color: #8b008b; }
+    
+    .bk-btn:hover {
+        background-color: #ff1493 !important; /* Rosado más oscuro al pasar el mouse */
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LÓGICA ORIGINAL (SIN CAMBIOS) ---
-def on_publish(client,userdata,result):             #create function for callback
+# --- LÓGICA ORIGINAL (MANTENIDA EXACTAMENTE IGUAL) ---
+def on_publish(client,userdata,result):
     print("el dato ha sido publicado \n")
     pass
 
@@ -43,10 +51,10 @@ def on_message(client, userdata, message):
 
 broker="broker.mqttdashboard.com"
 port=1883
-client1= paho.Client("GIT-HUBMANU") # Nombre de cliente original
+client1= paho.Client("GIT-HUBMANU")
 client1.on_message = on_message
 
-# --- INTERFAZ VISUAL ---
+# --- INTERFAZ ---
 st.title("Interfaces Multimodales")
 st.subheader("Control de voz")
 
@@ -54,12 +62,12 @@ try:
     image = Image.open('voice_ctrl.jpg')
     st.image(image, width=200)
 except:
-    st.write("🌸 (Imagen: voice_ctrl.jpg)")
+    pass
 
 st.write("Presiona el Botón y habla")
 
-# Botón Bokeh con color forzado por CSS
-stt_button = Button(label=" Inicio ", width=200, button_type="success")
+# El botón ahora heredará el estilo .bk-btn que definimos arriba
+stt_button = Button(label=" Inicio ", width=200)
 
 stt_button.js_on_event("button_click", CustomJS(code="""
     var recognition = new webkitSpeechRecognition();
@@ -90,14 +98,11 @@ result = streamlit_bokeh_events(
 
 if result:
     if "GET_TEXT" in result:
-        detectado = result.get("GET_TEXT")
-        st.write(f"Detectado: {detectado}")
-        
-        # --- LÓGICA DE PUBLICACIÓN ORIGINAL ---
+        st.write(result.get("GET_TEXT"))
         client1.on_publish = on_publish                             
         client1.connect(broker,port)  
-        message = json.dumps({"Act1":detectado.strip()})
-        ret= client1.publish("voice_manu", message) # Tópico y mensaje original
+        message = json.dumps({"Act1":result.get("GET_TEXT").strip()})
+        ret= client1.publish("voice_manu", message)
 
     try:
         os.mkdir("temp")
