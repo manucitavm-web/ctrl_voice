@@ -54,7 +54,7 @@ try:
     image = Image.open('voice_ctrl.jpg')
     st.image(image, width=200)
 except:
-    st.write("🌸 (Imagen: voice_ctrl.jpg)")
+    st.write("🌸 (Imagen: voz.png)")
 
 st.write("Presiona el Botón y habla")
 
