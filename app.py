@@ -4,81 +4,97 @@ from bokeh.models.widgets import Button
 from bokeh.models import CustomJS
 from streamlit_bokeh_events import streamlit_bokeh_events
 from PIL import Image
-import time
-import glob
-import paho.mqtt.client as paho
 import json
-from gtts import gTTS
-from googletrans import Translator
+import paho.mqtt.client as paho
 
-def on_publish(client,userdata,result):             #create function for callback
-    print("el dato ha sido publicado \n")
-    pass
+# --- CONFIGURACIÓN ESTÉTICA ---
+st.set_page_config(
+    page_title="Voice IoT Controller",
+    page_icon="🎙️",
+    layout="wide"
+)
 
-def on_message(client, userdata, message):
-    global message_received
-    time.sleep(2)
-    message_received=str(message.payload.decode("utf-8"))
-    st.write(message_received)
+# Estilo CSS para mejorar la UI
+st.markdown("""
+    <style>
+    .main { background-color: #f0f2f6; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    footer {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
 
-broker="broker.mqttdashboard.com"
-port=1883
-client1= paho.Client("GIT-HUBMANU")
-client1.on_message = on_message
+# --- LÓGICA MQTT ---
+broker = "broker.mqttdashboard.com"
+port = 1883
+client1 = paho.Client("GIT-HUBMANU-WEB")
 
+# --- INTERFAZ LATERAL (Sidebar) ---
+with st.sidebar:
+    st.header("⚙️ Configuración")
+    st.info("Este panel controla la conexión MQTT y el estado del sistema.")
+    status_placeholder = st.empty()
+    status_placeholder.markdown("🟢 **Sistema Online**")
+    
+    if st.button("Limpiar historial"):
+        st.cache_data.clear()
 
+# --- CUERPO PRINCIPAL ---
+col_img, col_text = st.columns([1, 2])
 
-st.title("Interfaces Multimodales")
-st.subheader("Control de voz")
+with col_img:
+    try:
+        # Intenta cargar la imagen (asegúrate de que esté en tu repo de GitHub)
+        image = Image.open('voice_ctrl.jpg')
+        st.image(image, use_container_width=True, caption="Escucha activa")
+    except:
+        st.image("https://via.placeholder.com/400x400.png?text=Icono+Voz", use_container_width=True)
 
-image = Image.open('voice_ctrl.jpg')
+with col_text:
+    st.title("Interfaces Multimodales")
+    st.subheader("Control de Voz e IoT")
+    st.write("Presiona el botón verde para dictar un comando. El texto se enviará automáticamente al broker MQTT.")
 
-st.image(image, width=200)
-
-
-
-
-st.write("Presiona el Botón y habla ")
-
-stt_button = Button(label=" Inicio ", width=200)
-
-stt_button.js_on_event("button_click", CustomJS(code="""
-    var recognition = new webkitSpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
- 
-    recognition.onresult = function (e) {
-        var value = "";
-        for (var i = e.resultIndex; i < e.results.length; ++i) {
-            if (e.results[i].isFinal) {
-                value += e.results[i][0].transcript;
+    # --- BOTÓN BOKEH PERSONALIZADO ---
+    stt_button = Button(label="🎙️ HABLAR AHORA", width=300, button_type="success")
+    stt_button.js_on_event("button_click", CustomJS(code="""
+        var recognition = new webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'es-ES';
+        
+        recognition.onresult = function (e) {
+            var value = e.results[0][0].transcript;
+            if (value != "") {
+                document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
             }
         }
-        if ( value != "") {
-            document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
-        }
-    }
-    recognition.start();
-    """))
+        recognition.start();
+        """))
 
-result = streamlit_bokeh_events(
-    stt_button,
-    events="GET_TEXT",
-    key="listen",
-    refresh_on_update=False,
-    override_height=75,
-    debounce_time=0)
+    result = streamlit_bokeh_events(
+        stt_button,
+        events="GET_TEXT",
+        key="listen",
+        refresh_on_update=False,
+        override_height=80,
+        debounce_time=0)
 
-if result:
-    if "GET_TEXT" in result:
-        st.write(result.get("GET_TEXT"))
-        client1.on_publish = on_publish                            
-        client1.connect(broker,port)  
-        message =json.dumps({"Act1":result.get("GET_TEXT").strip()})
-        ret= client1.publish("voice_manu", message)
+    # --- MANEJO DE RESULTADOS ---
+    if result and "GET_TEXT" in result:
+        comando = result.get("GET_TEXT")
+        
+        # Mostrar el comando en un recuadro llamativo
+        st.success(f"**Comando detectado:** {comando}")
+        
+        # Enviar vía MQTT
+        try:
+            client1.connect(broker, port)
+            message = json.dumps({"Act1": comando.strip()})
+            client1.publish("voice_manu", message)
+            st.toast(f"Publicado: {comando}", icon="📤")
+        except Exception as e:
+            st.error(f"Error al conectar con el broker: {e}")
 
-    
-    try:
-        os.mkdir("temp")
-    except:
-        pass
+# Crear carpeta temporal si no existe
+if not os.path.exists("temp"):
+    os.makedirs("temp")
