@@ -51,7 +51,7 @@ st.title("Interfaces Multimodales")
 st.subheader("Control de voz")
 
 try:
-    image = Image.open('voice_ctrl.jpg')
+    image = Image.open('voz.png')
     st.image(image, width=200)
 except:
     st.write("🌸 (Imagen: voz.png)")
